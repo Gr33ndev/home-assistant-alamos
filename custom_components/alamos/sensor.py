@@ -18,9 +18,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from . import AlamosConfigEntry
+from . import AlamosConfigEntry, active_webhook_ids
 from .alarm import AlarmState
-from .const import ATTR_DATA, ATTR_UNIT, ATTR_UNITS
+from .const import ATTR_DATA, ATTR_UNIT, ATTR_UNITS, ATTR_WEBHOOK
 from .entity import AlamosEntity
 
 # Home Assistant does not accept states longer than 255 characters.
@@ -42,6 +42,7 @@ class AlamosSensorEntityDescription(SensorEntityDescription):
     value_fn: Callable[[AlarmState], StateType | datetime]
     attrs_fn: Callable[[AlarmState], dict[str, Any]] | None = None
     requires_api: bool = False
+    webhook: int | None = None
 
 
 SENSORS: tuple[AlamosSensorEntityDescription, ...] = (
@@ -87,6 +88,7 @@ SENSORS: tuple[AlamosSensorEntityDescription, ...] = (
                 # The state is shown in seconds; the exact time makes every
                 # call a new entry in the history, even within one second.
                 "received": state.last_webhook.timestamp.isoformat(),
+                ATTR_WEBHOOK: state.last_webhook.webhook,
                 "method": state.last_webhook.method,
                 "result": state.last_webhook.result,
                 ATTR_DATA: state.last_webhook.data,
@@ -114,6 +116,18 @@ SENSORS: tuple[AlamosSensorEntityDescription, ...] = (
 )
 
 
+def _webhook_alarm_count(number: int) -> AlamosSensorEntityDescription:
+    return AlamosSensorEntityDescription(
+        key=f"alarm_count_{number}",
+        translation_key="webhook_alarm_count",
+        translation_placeholders={"number": str(number)},
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        webhook=number,
+        value_fn=lambda state: state.webhook_counts.get(number, 0),
+    )
+
+
 def _units_text(state: AlarmState) -> str | None:
     """Return all alarmed units, the favorite / first one leading."""
     if not state.units:
@@ -132,11 +146,16 @@ async def async_setup_entry(  # NOSONAR
 ) -> None:
     """Set up the sensors."""
     has_api = entry.runtime_data.client is not None
-    async_add_entities(
-        AlamosSensor(entry, description)
+    descriptions = [
+        description
         for description in SENSORS
         if has_api or not description.requires_api
-    )
+    ]
+    if (webhook_count := len(active_webhook_ids(entry))) > 1:
+        descriptions.extend(
+            _webhook_alarm_count(number) for number in range(1, webhook_count + 1)
+        )
+    async_add_entities(AlamosSensor(entry, description) for description in descriptions)
 
 
 class AlamosSensor(AlamosEntity, RestoreSensor):
@@ -152,10 +171,12 @@ class AlamosSensor(AlamosEntity, RestoreSensor):
         value = last.native_value
         if value is None:
             return
-        key = self.entity_description.key
-        if key == "alarm_count":
-            self.manager.async_restore(alarm_count=int(value))
-        elif key == "last_alarm" and isinstance(value, datetime):
+        description = self.entity_description
+        if description.key == "alarm_count" or description.webhook is not None:
+            self.manager.async_restore(
+                alarm_count=int(value), webhook=description.webhook
+            )
+        elif description.key == "last_alarm" and isinstance(value, datetime):
             self.manager.async_restore(last_alarm=value)
 
     @property

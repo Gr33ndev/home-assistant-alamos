@@ -8,14 +8,17 @@ from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_capture_events,
     async_fire_time_changed,
+    mock_restore_cache_with_extra_data,
 )
 
 from custom_components.alamos.const import (
+    CONF_ADDITIONAL_WEBHOOK_IDS,
     CONF_API_KEY,
     CONF_FAVORITE_UNIT,
     CONF_RESET_MINUTES,
     CONF_TEST_KEYWORDS,
     CONF_UNIT_FILTER,
+    CONF_WEBHOOK_COUNT,
     CONF_WEBHOOK_ID,
     DEFAULT_API_URL,
     DOMAIN,
@@ -24,7 +27,7 @@ from custom_components.alamos.const import (
     FEEDBACK_PATH,
 )
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.setup import async_setup_component
@@ -33,13 +36,15 @@ WEBHOOK_ID = "test_webhook"
 FEEDBACK_URL = f"{DEFAULT_API_URL}{FEEDBACK_PATH}"
 
 
-async def _setup(hass: HomeAssistant, api_key: str = "secret") -> MockConfigEntry:
+async def _setup(
+    hass: HomeAssistant, api_key: str = "secret", **options
+) -> MockConfigEntry:
     await async_setup_component(hass, "http", {})
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Feuerwehr",
         data={CONF_WEBHOOK_ID: WEBHOOK_ID},
-        options={CONF_API_KEY: api_key, CONF_RESET_MINUTES: 30},
+        options={CONF_API_KEY: api_key, CONF_RESET_MINUTES: 30, **options},
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -506,3 +511,93 @@ async def test_last_webhook_sensor(hass: HomeAssistant, hass_client_no_auth) -> 
     state = hass.states.get("sensor.feuerwehr_last_webhook")
     assert state.attributes["result"] == "ignored"
     assert state.attributes["data"] == {"event": "recall", "unit": "LZ9"}
+
+
+async def test_migration_adds_webhooks(hass: HomeAssistant) -> None:
+    """Entries from before multiple webhooks get the additional webhook IDs."""
+    entry = await _setup(hass)
+    assert entry.minor_version == 2
+    assert entry.data[CONF_WEBHOOK_ID] == WEBHOOK_ID
+    assert len(set(entry.data[CONF_ADDITIONAL_WEBHOOK_IDS])) == 4
+    assert not hass.states.get("sensor.feuerwehr_alarm_count_webhook_1")
+
+
+async def test_multiple_webhooks(hass: HomeAssistant, hass_client_no_auth) -> None:
+    """Every webhook counts its alarms, the total is their sum."""
+    entry = await _setup(hass, **{CONF_WEBHOOK_COUNT: 3})
+    alarms = async_capture_events(hass, EVENT_ALARM)
+    client = await hass_client_no_auth()
+    urls = [
+        f"/api/webhook/{webhook_id}"
+        for webhook_id in [
+            entry.data[CONF_WEBHOOK_ID],
+            *entry.data[CONF_ADDITIONAL_WEBHOOK_IDS],
+        ]
+    ]
+
+    resp = await client.get(urls[0], params={"keyword": "B3", "unit": "LZ1"})
+    assert await resp.text() == "ok"
+    resp = await client.get(urls[1], params={"keyword": "B3", "unit": "RD"})
+    assert await resp.text() == "merged"
+    resp = await client.get(urls[1], params={"keyword": "B3", "unit": "RD2"})
+    assert await resp.text() == "merged"
+    await client.get(urls[3], params={"keyword": "B3", "unit": "LZ4"})
+    await hass.async_block_till_done()
+
+    assert len(alarms) == 1
+    assert alarms[0].data["webhook"] == 1
+    assert hass.states.get("binary_sensor.feuerwehr_alarm").attributes["units"] == [
+        "LZ1",
+        "RD",
+        "RD2",
+    ]
+    assert hass.states.get("sensor.feuerwehr_alarm_count_webhook_1").state == "1"
+    assert hass.states.get("sensor.feuerwehr_alarm_count_webhook_2").state == "1"
+    assert hass.states.get("sensor.feuerwehr_alarm_count_webhook_3").state == "0"
+    assert not hass.states.get("sensor.feuerwehr_alarm_count_webhook_4")
+    assert hass.states.get("sensor.feuerwehr_alarm_count").state == "2"
+
+    resp = await client.get(urls[2], params={"keyword": "THL", "unit": "LZ3"})
+    assert await resp.text() == "ok"
+    await hass.async_block_till_done()
+    assert alarms[1].data["webhook"] == 3
+    assert hass.states.get("sensor.feuerwehr_alarm_count_webhook_3").state == "1"
+    assert hass.states.get("sensor.feuerwehr_alarm_count").state == "3"
+    last = hass.states.get("sensor.feuerwehr_last_webhook")
+    assert last.attributes["webhook"] == 3
+
+    await client.get(f"{urls[2]}?event=clear")
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.feuerwehr_alarm").state == "off"
+
+
+async def test_options_show_additional_webhooks(hass: HomeAssistant) -> None:
+    """The options list the URLs of all webhooks in use."""
+    entry = await _setup(hass, **{CONF_WEBHOOK_COUNT: 2})
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    additional = result["description_placeholders"]["additional_webhooks"]
+    assert "Webhook 2" in additional
+    assert entry.data[CONF_ADDITIONAL_WEBHOOK_IDS][0] in additional
+    assert "Webhook 3" not in additional
+
+
+async def test_restore_counts(hass: HomeAssistant) -> None:
+    """Counts survive a restart; untracked alarms are assigned to webhook 1."""
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State("sensor.feuerwehr_alarm_count", "7"),
+                {"native_value": 7, "native_unit_of_measurement": None},
+            ),
+            (
+                State("sensor.feuerwehr_alarm_count_webhook_2", "2"),
+                {"native_value": 2, "native_unit_of_measurement": None},
+            ),
+        ],
+    )
+    await _setup(hass, **{CONF_WEBHOOK_COUNT: 2})
+
+    assert hass.states.get("sensor.feuerwehr_alarm_count").state == "7"
+    assert hass.states.get("sensor.feuerwehr_alarm_count_webhook_1").state == "5"
+    assert hass.states.get("sensor.feuerwehr_alarm_count_webhook_2").state == "2"
