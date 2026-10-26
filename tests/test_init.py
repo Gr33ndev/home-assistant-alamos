@@ -635,3 +635,32 @@ async def test_restore_counts(hass: HomeAssistant) -> None:
     assert hass.states.get("sensor.feuerwehr_alarm_count").state == "7"
     assert hass.states.get("sensor.feuerwehr_alarm_count_webhook_1").state == "0"
     assert hass.states.get("sensor.feuerwehr_alarm_count_webhook_2").state == "2"
+
+
+async def test_reset_alarm_count(hass: HomeAssistant, hass_client_no_auth) -> None:
+    """The button and the service reset the alarm count."""
+    entry = await _setup(hass, api_key="")
+    client = await hass_client_no_auth()
+    url = f"/api/webhook/{WEBHOOK_ID}"
+    await client.get(url, params={"keyword": "B3"})
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.feuerwehr_alarm_count").state == "1"
+
+    await hass.services.async_call(
+        "button",
+        "press",
+        {"entity_id": "button.feuerwehr_reset_alarm_count"},
+        blocking=True,
+    )
+    assert hass.states.get("sensor.feuerwehr_alarm_count").state == "0"
+
+    await client.get(url, params={"keyword": "THL"})
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.feuerwehr_alarm_count").state == "1"
+    await hass.services.async_call(
+        DOMAIN,
+        "reset_alarm_count",
+        {"config_entry_id": entry.entry_id},
+        blocking=True,
+    )
+    assert hass.states.get("sensor.feuerwehr_alarm_count").state == "0"

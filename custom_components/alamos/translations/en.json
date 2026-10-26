@@ -75,6 +75,9 @@
       },
       "feedback_reject": {
         "name": "Reject alarm"
+      },
+      "reset_alarm_count": {
+        "name": "Reset alarm count"
       }
     },
     "event": {
@@ -177,6 +180,16 @@
     "reset_alarm": {
       "name": "Reset alarm",
       "description": "Marks the current alarm as finished.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Alamos entry",
+          "description": "Entry to reset. If omitted, all entries are reset."
+        }
+      }
+    },
+    "reset_alarm_count": {
+      "name": "Reset alarm count",
+      "description": "Resets the alarm count to 0.",
       "fields": {
         "config_entry_id": {
           "name": "Alamos entry",

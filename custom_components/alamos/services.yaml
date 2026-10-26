@@ -25,3 +25,10 @@ reset_alarm:
       selector:
         config_entry:
           integration: alamos
+reset_alarm_count:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: alamos

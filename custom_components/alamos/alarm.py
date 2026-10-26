@@ -272,6 +272,12 @@ class AlamosAlarmManager:
         self._notify()
 
     @callback
+    def async_reset_count(self) -> None:
+        """Reset the alarm count."""
+        self.state.alarm_count = 0
+        self._notify()
+
+    @callback
     def async_restore(
         self,
         alarm_count: int | None = None,
