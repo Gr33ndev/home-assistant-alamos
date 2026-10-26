@@ -34,6 +34,7 @@ from .const import (
     ATTR_CONFIG_ENTRY_ID,
     ATTR_MODE,
     ATTR_SUPPRESS_NOTIFICATION,
+    ATTR_WEBHOOK,
     CONF_ADDITIONAL_WEBHOOK_IDS,
     CONF_API_KEY,
     CONF_API_URL,
@@ -78,6 +79,13 @@ SEND_FEEDBACK_SCHEMA = vol.Schema(
     }
 )
 RESET_ALARM_SCHEMA = vol.Schema({vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string})
+RESET_ALARM_COUNT_SCHEMA = RESET_ALARM_SCHEMA.extend(
+    {
+        vol.Optional(ATTR_WEBHOOK): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=MAX_WEBHOOKS)
+        )
+    }
+)
 
 
 # Home Assistant requires this exact coroutine signature.
@@ -271,7 +279,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
     @callback
     def _handle_reset_alarm_count(call: ServiceCall) -> None:
         for entry in _async_get_entries(hass, call.data.get(ATTR_CONFIG_ENTRY_ID)):
-            entry.runtime_data.manager.async_reset_count()
+            entry.runtime_data.manager.async_reset_count(call.data.get(ATTR_WEBHOOK))
 
     hass.services.async_register(
         DOMAIN,
@@ -290,5 +298,5 @@ def _async_register_services(hass: HomeAssistant) -> None:
         DOMAIN,
         SERVICE_RESET_ALARM_COUNT,
         _handle_reset_alarm_count,
-        schema=RESET_ALARM_SCHEMA,
+        schema=RESET_ALARM_COUNT_SCHEMA,
     )

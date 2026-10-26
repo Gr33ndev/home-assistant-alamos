@@ -74,11 +74,11 @@ class AlamosFeedbackButton(AlamosEntity, ButtonEntity):
 
 
 class AlamosResetCountButton(AlamosEntity, ButtonEntity):
-    """Reset the alarm count."""
+    """Reset the alarm count and all webhook counts."""
 
     async def async_added_to_hass(self) -> None:
         """Buttons have no state that depends on the alarm."""
 
     async def async_press(self) -> None:
-        """Reset the count."""
+        """Reset the counts."""
         self.manager.async_reset_count()
