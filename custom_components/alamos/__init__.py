@@ -119,9 +119,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: AlamosConfigEntry) -> bo
     entry.async_on_unload(manager.async_shutdown)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    manager.async_finish_restore()
-
-    for number, webhook_id in enumerate(active_webhook_ids(entry), start=1):
+    # All webhooks stay registered, so a URL still set in the app never loses
+    # an alarm when the number of webhooks is reduced.
+    for number, webhook_id in enumerate(entry_webhook_ids(entry), start=1):
         webhook.async_register(
             hass,
             DOMAIN,
@@ -137,7 +137,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: AlamosConfigEntry) -> bo
     return True
 
 
-async def async_migrate_entry(hass: HomeAssistant, entry: AlamosConfigEntry) -> bool:
+# Home Assistant requires this exact coroutine signature.
+async def async_migrate_entry(  # NOSONAR
+    hass: HomeAssistant, entry: AlamosConfigEntry
+) -> bool:
     """Migrate an old config entry."""
     if entry.version > 1:
         return False
@@ -155,10 +158,14 @@ async def async_migrate_entry(hass: HomeAssistant, entry: AlamosConfigEntry) -> 
     return True
 
 
-def active_webhook_ids(entry: ConfigEntry) -> list[str]:
-    """Return the IDs of the webhooks in use, webhook 1 first."""
-    ids = [entry.data[CONF_WEBHOOK_ID], *entry.data[CONF_ADDITIONAL_WEBHOOK_IDS]]
-    return ids[: int(entry.options.get(CONF_WEBHOOK_COUNT, DEFAULT_WEBHOOK_COUNT))]
+def entry_webhook_ids(entry: ConfigEntry) -> list[str]:
+    """Return the IDs of all webhooks, webhook 1 first."""
+    return [entry.data[CONF_WEBHOOK_ID], *entry.data[CONF_ADDITIONAL_WEBHOOK_IDS]]
+
+
+def entry_webhook_count(entry: ConfigEntry) -> int:
+    """Return the number of webhooks with their own alarm count."""
+    return int(entry.options.get(CONF_WEBHOOK_COUNT, DEFAULT_WEBHOOK_COUNT))
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: AlamosConfigEntry) -> bool:

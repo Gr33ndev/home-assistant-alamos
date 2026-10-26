@@ -38,7 +38,7 @@
           "favorite_unit": "If several units are alerted, this unit is always listed first and used as the main unit (case-insensitive).",
           "test_keywords": "If the keyword contains one of these terms (e.g. \"Probealarm\"), only the `test_alarm` event is fired; the alarm sensor stays off.",
           "reset_minutes": "Use 0 for AMweb with a \"no alarm open anymore\" URL.",
-          "webhook_count": "aPager PRO supports up to 5 webhooks. Each one gets its own URL and alarm count; `?event=recall` and `?event=clear` work with every URL. Save and reopen the options to see new URLs."
+          "webhook_count": "Number of webhooks (1–5) with their own alarm count. All 5 webhook URLs above are always active; `?event=recall` and `?event=clear` work with every URL."
         }
       }
     }

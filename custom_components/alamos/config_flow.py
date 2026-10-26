@@ -18,7 +18,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
-from . import active_webhook_ids
+from . import entry_webhook_ids
 from .const import (
     CONF_ADDITIONAL_WEBHOOK_IDS,
     CONF_API_KEY,
@@ -197,7 +197,7 @@ class AlamosConfigFlow(ConfigFlow, domain=DOMAIN):
                     }
                 ),
                 description_placeholders=_webhook_placeholders(
-                    self.hass, self._webhook_ids[:DEFAULT_WEBHOOK_COUNT]
+                    self.hass, self._webhook_ids[:1]
                 ),
             )
 
@@ -238,6 +238,6 @@ class AlamosOptionsFlow(OptionsFlow):
             step_id="init",
             data_schema=_options_schema(dict(self.config_entry.options)),
             description_placeholders=_webhook_placeholders(
-                self.hass, active_webhook_ids(self.config_entry)
+                self.hass, entry_webhook_ids(self.config_entry)
             ),
         )

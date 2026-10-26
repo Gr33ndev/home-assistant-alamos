@@ -60,15 +60,11 @@ class AlarmState:
     source: str | None = None
     last_alarm: datetime | None = None
     last_cleared: datetime | None = None
+    alarm_count: int = 0
     webhook_counts: dict[int, int] = field(default_factory=dict)
     alarm_webhooks: set[int] = field(default_factory=set)
     feedback: FeedbackState | None = None
     last_webhook: WebhookInfo | None = None
-
-    @property
-    def alarm_count(self) -> int:
-        """Return the number of alarms of all webhooks."""
-        return sum(self.webhook_counts.values())
 
 
 class AlamosAlarmManager:
@@ -88,7 +84,6 @@ class AlamosAlarmManager:
         self._listeners: list[Callable[[], None]] = []
         self._event_listeners: list[Callable[[str, dict[str, Any]], None]] = []
         self._cancel_reset: CALLBACK_TYPE | None = None
-        self._restored_count = 0
         # Last test alarm / recall per kind, to drop the repeated webhooks
         # aPager PRO sends for every alarmed unit.
         self._recent: dict[str, tuple[datetime, str | None]] = {}
@@ -163,6 +158,7 @@ class AlamosAlarmManager:
         state.data = data
         state.source = source
         state.last_alarm = now
+        state.alarm_count += 1
         state.alarm_webhooks = set()
         self._count_alarm(webhook)
         self._schedule_reset()
@@ -284,27 +280,15 @@ class AlamosAlarmManager:
     ) -> None:
         """Restore values which should survive a restart.
 
-        Without ``webhook``, ``alarm_count`` is the total of all webhooks.
+        With ``webhook``, ``alarm_count`` is the count of that webhook.
         """
         if alarm_count is not None:
-            if webhook is None:
-                self._restored_count = alarm_count
-            else:
+            if webhook is not None:
                 self.state.webhook_counts.setdefault(webhook, alarm_count)
+            elif self.state.alarm_count == 0:
+                self.state.alarm_count = alarm_count
         if last_alarm is not None and self.state.last_alarm is None:
             self.state.last_alarm = last_alarm
-
-    @callback
-    def async_finish_restore(self) -> None:
-        """Keep the restored total, assigning untracked alarms to webhook 1.
-
-        This covers entries from before multiple webhooks and webhooks which
-        are not in use anymore.
-        """
-        if (missing := self._restored_count - self.state.alarm_count) > 0:
-            counts = self.state.webhook_counts
-            counts[1] = counts.get(1, 0) + missing
-            self._notify()
 
     @callback
     def async_shutdown(self) -> None:

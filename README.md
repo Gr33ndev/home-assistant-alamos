@@ -56,7 +56,7 @@ Unter **Einstellungen → Geräte & Dienste → Alamos → Konfigurieren** lasse
 | API-Schlüssel | Schlüssel ändern oder leeren (deaktiviert Buttons und Rückmelde-Service) |
 | Bestätigungs-Push unterdrücken | Standardwert für `suppress_notification` |
 | Alarm automatisch zurücksetzen | Minuten bis zum automatischen Zurücksetzen (0 = nie, z. B. bei AMweb mit „kein Alarm mehr offen“-URL) |
-| Anzahl Webhooks | 1 bis 5. Jeder Webhook bekommt eine eigene URL und einen eigenen Alarmzähler (siehe [Mehrere Webhooks](#mehrere-webhooks)) |
+| Anzahl Webhooks | Für wie viele Webhooks (1 bis 5) es einen eigenen Alarmzähler gibt. Alle 5 Webhook-URLs sind immer aktiv (siehe [Mehrere Webhooks](#mehrere-webhooks)) |
 | Einheiten-Filter | Nur Alarme dieser Einheiten verarbeiten, z. B. `LZ1`, `Florian Musterhausen 1/44` (Groß-/Kleinschreibung egal). Alarme ohne übermittelte Einheit werden immer verarbeitet, damit kein echter Alarm verloren geht |
 | Favoriten-Einheit | Werden mehrere Einheiten alarmiert, steht diese Einheit immer an erster Stelle (Sensor „Einheit“, Attribute `unit` und `units`), egal in welcher Reihenfolge die Webhooks ankommen. Groß-/Kleinschreibung egal |
 | Stichwörter für Probealarme | Enthält das Stichwort einen dieser Begriffe (z. B. `Probealarm`, `Test`), wird nur das Ereignis `test_alarm` ausgelöst. Alarm-Sensor und Zähler bleiben unverändert |
@@ -76,14 +76,15 @@ Bei POST darf `event` auch im JSON-Body stehen.
 
 ### Mehrere Webhooks
 
-Der aPager PRO kann bis zu 5 allgemeine Webhooks auslösen, z. B. einen je Einheit oder Organisation. Unter
-**Anzahl Webhooks** in den Optionen stellst du ein, wie viele die Integration anbietet. Nach dem Speichern zeigen die
-Optionen beim erneuten Öffnen alle URLs an; `?event=recall` und `?event=clear` funktionieren mit jeder davon.
+Der aPager PRO kann bis zu 5 allgemeine Webhooks auslösen, z. B. einen je Einheit oder Organisation. Jeder Eintrag
+hat dafür 5 Webhook-URLs, die immer aktiv sind; die Optionen zeigen alle an. `?event=recall` und `?event=clear`
+funktionieren mit jeder davon.
 
-Alle Webhooks teilen sich den Alarm-Sensor und die Einstellungen. Ab zwei Webhooks gibt es zusätzlich je Webhook einen
-Zähler `sensor.<name>_alarm_count_webhook_<n>`. Ein Webhook zählt jeden Alarm einmal, auch wenn er in einen laufenden
-Alarm zusammengefasst wird. Der Gesamtzähler `sensor.<name>_alarm_count` ist die Summe der Webhook-Zähler. Alarme aus
-der Zeit vor mehreren Webhooks oder von nicht mehr genutzten Webhooks zählen zu Webhook 1.
+Alle Webhooks teilen sich den Alarm-Sensor und die Einstellungen. Mit **Anzahl Webhooks** in den Optionen legst du fest,
+für wie viele Webhooks es einen eigenen Zähler `sensor.<name>_alarm_count_webhook_<n>` gibt (ab 2). Ein Webhook zählt
+jeden Alarm einmal, auch wenn er in einen laufenden Alarm zusammengefasst wird. `sensor.<name>_alarm_count` zählt
+weiterhin jeden Alarm genau einmal, egal über wie viele Webhooks er kam. Verringerst du die Anzahl, werden die Zähler
+der weggefallenen Webhooks entfernt; ihre URLs nehmen aber weiter Alarme an.
 
 | `event` | Wirkung |
 | --- | --- |
@@ -213,7 +214,7 @@ Behandle den iCal-Link wie ein Passwort. In der App kannst du ihn jederzeit zur�
 | `sensor.<name>_last_webhook` | *Diagnose.* Zeitpunkt des letzten Webhook-Aufrufs, egal ob Alarm, zusammengefasst, Probealarm, Rückalarm oder vom Einheiten-Filter ignoriert. Attribute: `received` (genauer Zeitpunkt), `webhook` (Nummer), `method`, `result` (`ok`, `merged`, `test`, `cleared`, `ignored`), `data` (Rohdaten). Im Verlauf steht damit jeder einzelne Aufruf |
 | `sensor.<name>_unit` | Alle Einheiten des letzten Alarms, Favoriten-Einheit zuerst (z. B. `LZ2, LZ1`). Attribute: `unit` (Haupteinheit), `units` (Liste) |
 | `sensor.<name>_last_alarm` | Zeitpunkt des letzten Alarms |
-| `sensor.<name>_alarm_count` | Anzahl empfangener Alarme, Summe aller Webhooks (Diagnose) |
+| `sensor.<name>_alarm_count` | Anzahl empfangener Alarme, jeder Alarm einmal (Diagnose) |
 | `sensor.<name>_alarm_count_webhook_<n>` | Anzahl Alarme je Webhook *(Diagnose, nur ab 2 Webhooks)* |
 | `sensor.<name>_last_feedback` | Ergebnis der letzten API-Rückmeldung *(nur mit API-Schlüssel)* |
 | `button.<name>_accept_alarm` | Alarm zusagen *(nur mit API-Schlüssel)* |
