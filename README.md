@@ -205,6 +205,7 @@ Behandle den iCal-Link wie ein Passwort. In der App kannst du ihn jederzeit zur�
 | `sensor.<name>_last_feedback` | Ergebnis der letzten API-R체ckmeldung *(nur mit API-Schl체ssel)* |
 | `button.<name>_accept_alarm` | Alarm zusagen *(nur mit API-Schl체ssel)* |
 | `button.<name>_reject_alarm` | Alarm absagen *(nur mit API-Schl체ssel)* |
+| `button.<name>_reset_alarm_count` | Setzt den Alarmz채hler auf 0 *(Konfiguration)* |
 
 ## Services
 
@@ -222,6 +223,10 @@ response_variable: result # optional: {"results": [{"status": 200, "result": "su
 ### `alamos.reset_alarm`
 
 Setzt den Alarm-Sensor zur체ck (optional `config_entry_id`).
+
+### `alamos.reset_alarm_count`
+
+Setzt den Alarmz채hler auf 0 (optional `config_entry_id`), z. B. per Automation zum Jahreswechsel.
 
 ## Events
 

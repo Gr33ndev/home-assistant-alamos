@@ -73,6 +73,9 @@
       },
       "feedback_reject": {
         "name": "Alarm absagen"
+      },
+      "reset_alarm_count": {
+        "name": "Alarmzähler zurücksetzen"
       }
     },
     "event": {
@@ -169,6 +172,16 @@
     "reset_alarm": {
       "name": "Alarm zurücksetzen",
       "description": "Markiert den aktuellen Alarm als beendet.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Alamos-Eintrag",
+          "description": "Zurückzusetzender Eintrag. Ohne Angabe werden alle Einträge zurückgesetzt."
+        }
+      }
+    },
+    "reset_alarm_count": {
+      "name": "Alarmzähler zurücksetzen",
+      "description": "Setzt den Alarmzähler auf 0.",
       "fields": {
         "config_entry_id": {
           "name": "Alamos-Eintrag",

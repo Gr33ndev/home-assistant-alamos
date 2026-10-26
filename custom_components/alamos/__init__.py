@@ -47,6 +47,7 @@ from .const import (
     EVENT_TYPE_CLEARED,
     FEEDBACK_MODES,
     SERVICE_RESET_ALARM,
+    SERVICE_RESET_ALARM_COUNT,
     SERVICE_SEND_FEEDBACK,
 )
 from .receiver import async_create_webhook_handler
@@ -230,6 +231,11 @@ def _async_register_services(hass: HomeAssistant) -> None:
         for entry in _async_get_entries(hass, call.data.get(ATTR_CONFIG_ENTRY_ID)):
             entry.runtime_data.manager.async_clear(EVENT_TYPE_CLEARED)
 
+    @callback
+    def _handle_reset_alarm_count(call: ServiceCall) -> None:
+        for entry in _async_get_entries(hass, call.data.get(ATTR_CONFIG_ENTRY_ID)):
+            entry.runtime_data.manager.async_reset_count()
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_SEND_FEEDBACK,
@@ -241,5 +247,11 @@ def _async_register_services(hass: HomeAssistant) -> None:
         DOMAIN,
         SERVICE_RESET_ALARM,
         _handle_reset_alarm,
+        schema=RESET_ALARM_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_RESET_ALARM_COUNT,
+        _handle_reset_alarm_count,
         schema=RESET_ALARM_SCHEMA,
     )
