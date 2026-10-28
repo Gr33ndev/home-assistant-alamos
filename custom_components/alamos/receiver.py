@@ -148,7 +148,7 @@ def _process_payload(
 
     event = str(payload.pop(WEBHOOK_EVENT_PARAM, "") or "").strip().lower()
     if event in WEBHOOK_CLEAR_VALUES:
-        manager.async_clear(EVENT_TYPE_CLEARED)
+        manager.async_clear(EVENT_TYPE_CLEARED, webhook=number)
         return web.Response(status=200, text="cleared")
 
     keyword, unit = _keyword_and_unit(entry, payload)
@@ -165,7 +165,8 @@ def _process_payload(
                 ATTR_DATA: payload,
                 ATTR_RECALL: True,
                 ATTR_WEBHOOK: number,
-            }
+            },
+            number,
         )
         return web.Response(status=200, text="cleared" if reported else "merged")
 
