@@ -727,21 +727,21 @@ async def test_webhook_event_entities(
 
     await client.get(f"{urls[1]}?event=recall", params={"keyword": "B3"})
     await hass.async_block_till_done()
-    second = hass.states.get("event.feuerwehr_alarm_event_webhook_2")
-    assert second.attributes["event_type"] == "cleared"
-    assert second.attributes["recall"] is True
-    assert (
-        hass.states.get("event.feuerwehr_alarm_event_webhook_1").attributes[
-            "event_type"
-        ]
-        == "alarm"
-    )
+    for number in (1, 2):
+        state = hass.states.get(f"event.feuerwehr_alarm_event_webhook_{number}")
+        assert state.attributes["event_type"] == "cleared"
+        assert state.attributes["recall"] is True
+
+    first = hass.states.get("event.feuerwehr_alarm_event_webhook_1")
+    await client.get(f"{urls[0]}?event=recall", params={"keyword": "B3"})
+    await hass.async_block_till_done()
+    assert hass.states.get("event.feuerwehr_alarm_event_webhook_1") == first
 
 
 async def test_webhook_event_test_alarm_and_clear(
     hass: HomeAssistant, hass_client_no_auth
 ) -> None:
-    """Test alarms reach every webhook once; a clear reaches the clearing webhook."""
+    """Test alarms reach every webhook once; a clear reaches the alarmed webhooks."""
     entry = await _setup(hass, **{CONF_WEBHOOK_COUNT: 2, CONF_TEST_KEYWORDS: ["Probe"]})
     alarms = async_capture_events(hass, EVENT_ALARM)
     client = await hass_client_no_auth()
@@ -757,12 +757,40 @@ async def test_webhook_event_test_alarm_and_clear(
         assert state.attributes["event_type"] == "test_alarm"
 
     await client.get(urls[0], params={"keyword": "BMA"})
-    await client.get(f"{urls[0]}?event=clear")
+    await client.get(f"{urls[1]}?event=clear")
     await hass.async_block_till_done()
     state = hass.states.get("event.feuerwehr_alarm_event_webhook_1")
     assert state.attributes["event_type"] == "cleared"
     state = hass.states.get("event.feuerwehr_alarm_event_webhook_2")
     assert state.attributes["event_type"] == "test_alarm"
+
+
+async def test_webhook_event_cleared_on_reset(
+    hass: HomeAssistant, hass_client_no_auth, freezer
+) -> None:
+    """The auto reset and the reset service clear every alarmed webhook."""
+    entry = await _setup(hass, **{CONF_WEBHOOK_COUNT: 3, CONF_RESET_MINUTES: 5})
+    client = await hass_client_no_auth()
+    urls = [f"/api/webhook/{webhook_id}" for webhook_id in entry_webhook_ids(entry)]
+
+    for url in urls[:2]:
+        await client.get(url, params={"keyword": "B3"})
+    freezer.tick(timedelta(minutes=6))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    for number in (1, 2):
+        state = hass.states.get(f"event.feuerwehr_alarm_event_webhook_{number}")
+        assert state.attributes["event_type"] == "cleared"
+    assert hass.states.get("event.feuerwehr_alarm_event_webhook_3").state == "unknown"
+
+    first = hass.states.get("event.feuerwehr_alarm_event_webhook_1")
+    await client.get(urls[2], params={"keyword": "F2"})
+    await hass.services.async_call(
+        DOMAIN, "reset_alarm", {"config_entry_id": entry.entry_id}, blocking=True
+    )
+    state = hass.states.get("event.feuerwehr_alarm_event_webhook_3")
+    assert state.attributes["event_type"] == "cleared"
+    assert hass.states.get("event.feuerwehr_alarm_event_webhook_1") == first
 
 
 async def test_webhook_event_entities_are_removed(hass: HomeAssistant) -> None:

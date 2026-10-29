@@ -104,7 +104,8 @@ conditions:
 ```
 
 Probealarme (`test_alarm`) und Rückalarme (`cleared`) über diesen Webhook kommen dort ebenfalls an, je Webhook nur
-einmal. `cleared` gibt es außerdem, wenn über diesen Webhook `?event=clear` einen laufenden Alarm beendet.
+einmal. Endet ein Alarm, egal wie (Rückalarm oder `?event=clear` über einen beliebigen Webhook, automatisches
+Zurücksetzen, `alamos.reset_alarm`), bekommen alle Webhooks, die den Alarm gemeldet haben, `cleared`.
 
 | `event` | Wirkung |
 | --- | --- |

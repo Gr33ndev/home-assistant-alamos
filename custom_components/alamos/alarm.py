@@ -234,9 +234,15 @@ class AlamosAlarmManager:
         Returns False if it repeats the last recall (another unit).
         """
         keyword = data.get("keyword")
+        cleared: set[int] = set()
         if reported := not self._is_repeat("recall", keyword):
+            if self.state.active:
+                cleared = set(self.state.alarm_webhooks)
             self.async_clear(EVENT_TYPE_CLEARED, data, force_event=True)
-        if not self._is_repeat(f"recall_{webhook}", keyword):
+        # Webhooks already cleared with the alarm drop their own recall.
+        for number in cleared:
+            self._is_repeat(f"recall_{number}", keyword)
+        if webhook not in cleared and not self._is_repeat(f"recall_{webhook}", keyword):
             self._notify_webhook(webhook, EVENT_TYPE_CLEARED, data)
         return reported
 
@@ -265,21 +271,21 @@ class AlamosAlarmManager:
         data: dict[str, Any] | None = None,
         *,
         force_event: bool = False,
-        webhook: int | None = None,
     ) -> None:
         """Mark the alarm as finished.
 
         The event is only fired if an alarm was active, unless ``force_event``
         is set (e.g. for an explicit recall which should always be reported).
-        ``webhook`` is the webhook which reported the end of the alarm.
+        Every webhook which reported the active alarm gets the event too.
         """
         self._cancel_timer()
         was_active = self.state.active
         self.state.active = False
         self.state.last_cleared = dt_util.utcnow()
         self._notify(event_type if was_active or force_event else None, data)
-        if was_active and webhook is not None:
-            self._notify_webhook(webhook, event_type, data or {})
+        if was_active:
+            for webhook in sorted(self.state.alarm_webhooks):
+                self._notify_webhook(webhook, event_type, data or {})
 
     @callback
     def async_feedback(self, mode: str, result: str) -> None:
