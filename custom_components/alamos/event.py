@@ -89,6 +89,7 @@ class AlamosWebhookEvent(AlamosEntity, EventEntity):
     def _handle_event(
         self, webhook: int, event_type: str, data: dict[str, Any]
     ) -> None:
+        """Fire the event if it was reported by this webhook."""
         if webhook != self._webhook:
             return
         self._trigger_event(event_type, data)

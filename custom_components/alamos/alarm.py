@@ -130,6 +130,7 @@ class AlamosAlarmManager:
     def _notify_webhook(
         self, webhook: int, event_type: str, data: dict[str, Any]
     ) -> None:
+        """Pass an event of one webhook to the webhook listeners."""
         for listener in self._webhook_listeners.copy():
             listener(webhook, event_type, data)
 
@@ -194,6 +195,7 @@ class AlamosAlarmManager:
         return True
 
     def _count_alarm(self, webhook: int) -> bool:
+        """Count the alarm for a webhook, return False if it already was."""
         state = self.state
         if webhook in state.alarm_webhooks:
             return False
